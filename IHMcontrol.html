@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Monitor - Manuel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>Moniteur Manuel</h1>
+    <button class="main-btn btn-connect" onclick="connexion()">1. ÉTABLIR LA CONNEXION</button>
+    <div id="status-text" class="status">Statut: Déconnecté</div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <div class="label">Température</div>
+        <div class="value" style="color: var(--temp-color)"><span id="temp-val">--</span>°C</div>
+        <button class="btn-refresh" onclick="updateTemp()">Lire le capteur</button>
+    </div>
+
+    <div class="card">
+        <div class="label">Humidité</div>
+        <div class="value" style="color: var(--hum-color)"><span id="hum-val">--</span>%</div>
+        <button class="btn-refresh" onclick="updateHum()">Lire le capteur</button>
+    </div>
+
+    <div class="card">
+        <div class="label">Luminosité</div>
+        <div class="value" style="color: var(--light-color)"><span id="light-val">--</span> lx</div>
+        <button class="btn-refresh" onclick="updateLight()">Lire le capteur</button>
+    </div>
+
+    <div class="controls">
+        <button class="main-btn btn-on" onclick="envoyerCommande('light_on')">LAMPE ON</button>
+        <button class="main-btn btn-off" onclick="envoyerCommande('light_off')">LAMPE OFF</button>
+        <button class="main-btn" onclick="envoyerCommande('open')">OUVRIR PORTE</button>
+        <button class="main-btn" onclick="envoyerCommande('close')">FERMER PORTE</button>
+    </div>
+</div>
+
+<script>
+    let port, writer, reader, state = false;
+
+    async function connexion() {
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            reader = port.readable.getReader();
+            writer = port.writable.getWriter();
+            state = true;
+            document.getElementById("status-text").textContent = "Statut: Connecté !";
+            document.getElementById("status-text").style.color = "#22c55e";
+        } catch (error) {
+            alert("Erreur de connexion.");
+        }
+    }
+
+    async function envoyerCommande(commande) {
+        if (!state) { alert("Connectez le port d'abord !"); return; }
+        
+        try {
+            // On envoie la commande
+            await writer.write(new TextEncoder().encode(commande + "\n"));
+            
+            // On attend la réponse
+            const { value } = await reader.read();
+            return new TextDecoder().decode(value).trim();
+        } catch (e) {
+            console.log("Erreur:", e);
+        }
+    }
+
+    // Fonctions d'acquisition individuelle
+    async function updateTemp() {
+        let res = await envoyerCommande("get_temperature");
+        if(res.startsWith("temp")) document.getElementById("temp-val").textContent = res.split(":")[1];
+    }
+
+    async function updateHum() {
+        // Attention : vérifie que ton Arduino a bien "get_humidity" (avec _)
+        let res = await envoyerCommande("get_humidity");
+        if(res.startsWith("hum")) document.getElementById("hum-val").textContent = res.split(":")[1];
+    }
+
+    async function updateLight() {
+        let res = await envoyerCommande("get_light");
+        if(res.startsWith("light")) document.getElementById("light-val").textContent = res.split(":")[1];
+    }
+</script>
+</body>
+</html>
